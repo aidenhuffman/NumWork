@@ -1,0 +1,122 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{graphics}
+
+\usepackage{subcaption}
+\usepackage{caption}
+
+\usepackage{amssymb}
+\usepackage{amsmath}
+
+\usepackage{multicol}
+\usepackage{color}
+
+\title{Numerical Work: Hawkes Processes in Limit Order Books}
+\author{Aiden Huffman, Anatoliy Swishchuk}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section*{Numerical Analysis}
+
+In order to test the validity of our models and determine which best fits empirical data, we have considered level 1 LOB data for Apple, Amazon, Google, Microsoft and Intel on June 21st, 2012 [\textcolor{blue}{ref:LOBSTER}]. We first verify that the data is reasonable for our model but checking it's liquidity, this is illustrated in Table [\ref{table:liquidity}].
+
+\input{Tables/table_liquidity.tex}
+
+The high number of daily price changes suggests that we can use asymptotic analysis in order to approximate long-run volatility using order flow by finding the diffusion limit of the price process [\textcolor{blue}{ref:tyler - copied}]. Because we do not want to include opening and closing auctions we omit the first and last fifteen minutes of our data. We motivate the arrival process by analyzing the inter-arrival times and clustering to a ensure the arrival process is not Poisson and exhibits the characteristics of a Hawkes Process, this is illustrated in Figures [\ref{fig:poisson}] and [\ref{fig:clustering}].
+
+Furthermore, the relationship between our diffusion coefficient and arrival process is limited to the expected number of arrivals on a unit interval. This implies that results for a simple exponential model can be easily generalized to a non-linear one. This makes it possible to work with a simplified model for our Hawkes process which is still rich enough to capture our observations. Keeping this in mind, we restrict ourselves to an exponential kernel and estimate parameters using a MLE [\textcolor{blue}{ref:laub}]. We provide these estimates in Table [\ref{table:params}] and compare the empirical expected number of arrivals and compare with the MLE estimate in Table [\ref{table:unitinterval}]
+
+\input{Tables/table_params.tex}
+
+Obviously the MLE method accurately estimates the expected number of arrivals on the unit interval. This means we can confidently say for our data that our parameters will work reasonably with our models. We provide the estimated parameters in Table [\ref{table:params}]
+
+\input{Tables/table_unitinterval.tex}
+
+\subsection*{CHPDO}
+
+We first consider a compound Hawkes process with dependent orders, namely
+\begin{equation}
+    S_t = S_0 + \sum_{k=1}^{N(t)}X_k
+\end{equation}
+where $X_k\in\{+\delta, -\delta\}$ is a continuous-time two state Markov chain, $\delta$ is of fixed size and $N(t)$ is the number of mid price movements up to time $t$ described by a Hawkes process.
+
+We have opted to study the mid price changes of our model. Thus $S_t$ can be computed by averaging the best bid and ask price. Noting that the price is recorded in cents the smallest possible jump in the mid price is a half a cent which we will use as $\delta$. Furthermore, in order to estimate the transition matrix for the Markov chain $X_k$ we count the absolute frequencies of upward and downward price movements and from this calculate the relative frequencies giving an estimate for $p_{uu}$ and $p_{dd}$ which represent the conditional probabilities of an up/down movement given an up/down movement. Later we will consider several different sizes of mid price movements and will work with the convention that each movement will be assigned a state based off of its ordering in the reals. In this case, $-\delta$ will be state one, and $\delta$ with be state two. This results in the transition matrix $P$ given below.
+
+\[P =
+\begin{bmatrix}
+p_{dd} & 1-p_{dd}\\
+1-p_{uu} & p_{uu}
+\end{bmatrix}
+\]
+
+After determining our parameters and transition probabilities we calculate $a^*$ and $\sigma$ in Table [\ref{table:chpdo_coeff}] together with $p_{uu}$ and $p_{dd}$.
+
+\input{Tables/table_chpdovalues.tex}
+
+Provided these values we can test our claim that our model accurately describes the mid price process satisfies we will use the diffusion limit proved earier, namely
+\begin{equation}
+    \frac{S_{nt} - N(nt)a^*}{\sqrt{n}}\xrightarrow{n\to\infty} \sigma\sqrt{\frac{\lambda}{1-\alpha/\beta}}W(t).
+\end{equation}
+If the data satisfies our proposed model then when considering large windows of time (5min, 10min, 20min), then when we would expect to see the empirical and theoretical standard deviations to follow each other closely. To test this we compare the equivalent process, constructed by multiplying the LHS and RHS by $\sqrt{n}$. Then cutting our data into disjoint windows of size $n$, specifically $[in, (i+1)n]$ with $t = 1$ and by setting the left bound as our starting time we can calculate $S_{nt} - N(nt)a^*$ for each individual window and give a generalized formula for this below.
+\begin{equation}\label{eq:S_star}
+    S^*_{i} = S_{(i+1)nt} - S_{int} - (N((i+1)nt) - N(int))a^*
+\end{equation}
+ This gives a collection of values $\{S^*_i\}$ over which we compute the standard deviation. If our model is accurate would would expect that 
+ \begin{equation}
+    \text{std}\{S^*_i\} \approx \sqrt{nt}\sigma\sqrt{\frac{\lambda}{1-\alpha/\beta}},\ \text{where } t = 1.
+ \end{equation}
+ We plot the empirical standard deviation against the theoretical one for various window sizes starting at 10 seconds and increasing in steps of 10 seconds until we reach 20 minutes, this is illustrated in Figure [\ref{fig:chpdofit}].
+
+Several important remarks should be made at this point. It is clear that while the model accurately predicts the overall trend for MSFT and INTC, we severely underestimate the variability in the mid price process for APPL, AMZN and GOOG. Furthermore, as the window size increases the overall spread in the data increases. We attribute this to the decreasing sample size imposed on us as we increase the window size. For example when we consider a 20 minute window, we can only construct 27 disjoint windows in the 9 hour trading day forcing us to deal with the problem of predicting a 'population' standard deviation from a increasingly small sample. We remedy this by using a variance stabilizing transformation in later sections. Specifically, a popular method for a Poisson process is to take the square root of our empirical and theoretical standard deviations. This makes it possible to see the overall trend in the data better and gain a clearer idea of goodness of fit from there.
+
+\subsection*{GCHP2SDO}
+
+As of now we have considered a fixed delta related to the trading tick size. However, if we consider the mid price changes for APPL, AMZN and GOOG the assumption of a fixed tick size is violated. In fact, we observe that approximately approximately 61\%, 53\% and 71\% of all mid price changes are larger than half a tick size, which is opposed to what we observe for MSFT and INTC where all mid price changes occur at the half tick size, we illustrate this for AAPL, AMZN and GOOG in Figure [\ref{fig:tickhist}].
+
+It is clear in Figure [\ref{fig:tickhist}] additional considerations need to be made. A simple way to include the variability in mid price movements in our model is to introduce $a(X_i)$ as described in [\textcolor{blue}{eq:GCHP2SDO}]. It is of course necessary to determine the values of $a( \cdot )$ for each state of our Markov chain. A naive method is to take the mean of the downward and upward mid price movements and assign them to $a(1)$ and $a(2)$ respectively. We provide these values in Table [\ref{table:2sdoticks}].
+
+\input{Tables/table_tick2SDO.tex}
+
+In this step we have only endeavoured to better realize the actual price movements in our data. Therefore, when we observe a downward mid price movement we continue to assign it to state one and similarly for an upward price movement we continue to assign it to state two. It follows that our transition matrix will remain the same. Then using these new state values we recalculate $a^*$ and $\sigma$, providing them in Table [\ref{table:2SDO_coeff}]. The effect of these changes is investigated in Figure [\ref{fig:2SDOfit}]. Note that in Figure [\ref{fig:2SDOfit}] we have used the variance stabilizing transformation discussed earlier in order to better see the overall trend in our data.
+
+\input{Tables/table_2SDO_coeff.tex}
+
+We see a significant improvement in the fits for AAPL and GOOG but the variability in mid price movements for AMZN is still underestimated by our model. The unexplained variance may be captured by investigating an n-state Markov chain since the additional transition probabilities could explain the variability missing in the 2-state case. [\textcolor{blue}{Motivate N-state process more}]
+
+\subsection*{GCHPNSDO}
+
+We introduce the N-state model described in Eq. [\textcolor{blue}{GCHPNSDO EQ}]. The immediate question becomes how best to choose the state values. We modify the quantile based approach from [\textcolor{blue}{ref:tyler}] [\textcolor{blue}{Can we motivate this?}]. After calculating the mid price changes we separate the data into upward and downward price movements. Then we calculate evenly distributed quantiles for both data sets. Depending on the data, several quantiles may be identical, we reject any duplicates. We thus obtain a list of bounds which we complete by adding the minimum observed value if necessary.
+
+To determine the state values $a(X_i)$, we take the average of all mid price changes located between two neighbouring boundary values. Furthermore, we assign a mid price change to state $i$ if it is greater than or equal to the $(i-1)$th boundary and strictly less than the $i$th boundary. An exception is made for the largest upper bound where equality is permitted at both ends.
+
+As we could not capture the full variability of mid price changes for AMZN before. In this case for tractability we consider 14 boundary values to generate a 12-state Markov chain. Instead of providing the transition matrix, we provide the ergodic probabilities for the transition matrix and the associated states in Table [\ref{table:AMZN_data}].
+\input{Tables/table_AMZN_data.tex}
+In order to compare the two state and N-state approaches we first take a qualitative approach and plot the two theoretical and empirical standard deviations against each other. Then we take the mean of the residuals for each point to gain a better quantitative understanding of the overall improvement.
+
+\subsection*{Conclusion}
+
+It is clear that while our model does visually appear to fit the expected variability with significant precision, it still fails to capture the complete dynamics of mid price changes such in the case of AMZN. Regardless, when we investigate the mean residuals for AAPL and GOOG we see the N-state case can still improve our results from the two state case. We constructed a 17 state Markov chain for AAPL, which resulted in a mean residual of $0.0036$ which is approximately a 28\% improvement to the two state case where the mean residual was $0.0050$. Even more extreme, using a 25 state Markov chain for GOOG which resulted in a mean residual of $0.0046$ which is a 60\% improvement from the two state case with a mean residual of $0.0115$. We conclude with Table [\ref{table:meanres}] which provides the mean residuals for AAPL, AMZN and GOOG with several of Markov chains of varying numbers of states. We also include mean residuals for INTC and MSFT in the two state case.
+
+\input{Tables/table_MeanResiduals.tex}
+
+\newpage
+
+\input{Figures/Poisson_Figure.tex}
+
+\input{Figures/Cluster_Figure.tex}
+
+\input{Figures/CHPDO_Figure.tex}
+
+\input{Figures/Tick_Hist_Figure.tex}
+
+\input{Figures/2SDO_Figure.tex}
+
+\input{Figures/AMZN_Data_Figure.tex}
+
+\end{document}

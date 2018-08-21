@@ -1,0 +1,14 @@
+\begin{table}[htpb]
+    \centering
+    \begin{tabular}{c|c|c|c|c|c}
+     & CHPDO & 2 & 8 & 16 & 32\\
+    \hline
+    AAPL & 0.2679 & 0.0050 & 0.0036 & 0.0036 & 0.0036\\
+    AMZN & 0.1122 & 0.0208 & 0.0131 & 0.0124 & 0.0123\\
+    GOOG & 0.4036 & 0.0115 & 0.0048 & 0.0045 & 0.0047\\
+    INTC & 1.7917e-5 & * & * & * & *\\
+    MSFT & 1.0586e-4 & * & * & * & *
+    \end{tabular}
+    \caption{\label{table:meanres} We list the mean residuals for several Markov chains with varying numbers of states. These were generated using our modified quantile approach choosing 2, 8, 16 or 32 quantiles. We see that in general the mean residual decreases to some lower limit where we can no longer perform any better. Furthermore we place *'s for INTC and MSFT since their calculations can not result in a better mean residual. This should be clear as the only observed mid price changes were a half tick size and therefore the only unique quantiles will be the same as the CHPDO case.}
+    
+\end{table}
